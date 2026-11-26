@@ -106,6 +106,19 @@ func TestPlain(t *testing.T) {
 	}
 }
 
+func TestHostNames(t *testing.T) {
+	for in, want := range map[string]string{"Claude.Monster": "claude.monster", "claude.local:8787": "claude.local", "[::1]:80": "::1", "192.168.1.14:8787": "192.168.1.14"} {
+		if got := hostName(in); got != want {
+			t.Errorf("hostName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	for in, want := range map[string]bool{"localhost:8787": true, "127.0.0.1": true, "[::1]:8787": true, "claude.local": false, ":8787": false, "0.0.0.0:8787": false} {
+		if loopback(in) != want {
+			t.Errorf("loopback(%q) != %v", in, want)
+		}
+	}
+}
+
 func TestOlder(t *testing.T) {
 	for _, c := range []struct {
 		a, b string

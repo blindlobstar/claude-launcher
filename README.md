@@ -13,7 +13,8 @@ projects, one subfolder each. Build it, then run it there:
 | Variable | Default | |
 |---|---|---|
 | `LAUNCHER_ADDR` | `127.0.0.1:8787` | where the page listens |
-| `LAUNCHER_PASSWORD` | none | required unless the address is loopback; any user name |
+| `LAUNCHER_HOSTS` | none | names the page is opened by, such as `claude.local`; needed to listen beyond loopback without a password |
+| `LAUNCHER_PASSWORD` | none | asks for this password (any user name) |
 | `LAUNCHER_PERMISSION_MODE` | `default` | passed to `claude remote-control` |
 
 Everything else in its environment, such as `GH_TOKEN`, reaches Claude.

@@ -30,7 +30,8 @@ var (
 	home, _     = os.UserHomeDir()
 	addr        = env("LAUNCHER_ADDR", "127.0.0.1:8787")
 	password    = os.Getenv("LAUNCHER_PASSWORD")
-	projectsDir = "" // the folder it is started in: one subfolder per project
+	hosts       = strings.Fields(strings.ToLower(os.Getenv("LAUNCHER_HOSTS"))) // names the page is opened by
+	projectsDir = ""                                                           // the folder it is started in: one subfolder per project
 	permMode    = env("LAUNCHER_PERMISSION_MODE", "default")
 	page        = template.Must(template.ParseFS(assets, "page.html"))
 )
@@ -45,8 +46,8 @@ func env(key, fallback string) string {
 func main() {
 	os.Unsetenv("LAUNCHER_PASSWORD") // Claude inherits the rest of the environment, not this
 	os.Setenv("PATH", filepath.Join(home, ".local", "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
-	if password == "" && !loopback(addr) {
-		log.Fatal("set LAUNCHER_PASSWORD to listen on " + addr + ": whoever opens this page can sign Claude in to an account of their own")
+	if password == "" && len(hosts) == 0 && !loopback(addr) {
+		log.Fatal("to listen on " + addr + ", set LAUNCHER_HOSTS to the names the page is opened by, or LAUNCHER_PASSWORD")
 	}
 	var err error
 	if projectsDir, err = os.Getwd(); err != nil {
@@ -173,9 +174,9 @@ func guard(next http.Handler) http.Handler {
 				http.Error(w, "password required", http.StatusUnauthorized)
 				return
 			}
-		} else if !loopback(r.Host) {
-			// without a password the page answers only to its loopback name,
-			// so a website can't reach it by pointing its own name at 127.0.0.1
+		} else if !loopback(r.Host) && !slices.Contains(hosts, hostName(r.Host)) {
+			// without a password the page answers only to its own names, so a
+			// website can't reach it by pointing a name of its own at this machine
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
@@ -191,12 +192,17 @@ func guard(next http.Handler) http.Handler {
 	})
 }
 
-func loopback(hostport string) bool {
-	host := hostport
+// hostName is the name or address in "host:port" or "host", in lower case.
+func hostName(hostport string) string {
 	if h, _, err := net.SplitHostPort(hostport); err == nil {
-		host = h
+		hostport = h
 	}
-	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return strings.ToLower(strings.Trim(hostport, "[]"))
+}
+
+func loopback(hostport string) bool {
+	host := hostName(hostport)
+	ip := net.ParseIP(host)
 	return host == "localhost" || (ip != nil && ip.IsLoopback())
 }
 
