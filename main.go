@@ -30,7 +30,7 @@ var (
 	home, _     = os.UserHomeDir()
 	addr        = env("LAUNCHER_ADDR", "127.0.0.1:8787")
 	password    = os.Getenv("LAUNCHER_PASSWORD")
-	projectsDir = env("LAUNCHER_PROJECTS", filepath.Join(home, "projects"))
+	projectsDir = "" // the folder it is started in: one subfolder per project
 	permMode    = env("LAUNCHER_PERMISSION_MODE", "default")
 	page        = template.Must(template.ParseFS(assets, "page.html"))
 )
@@ -48,7 +48,8 @@ func main() {
 	if password == "" && !loopback(addr) {
 		log.Fatal("set LAUNCHER_PASSWORD to listen on " + addr + ": whoever opens this page can sign Claude in to an account of their own")
 	}
-	if err := os.MkdirAll(projectsDir, 0o755); err != nil {
+	var err error
+	if projectsDir, err = os.Getwd(); err != nil {
 		log.Fatal(err)
 	}
 

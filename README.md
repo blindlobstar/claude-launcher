@@ -4,15 +4,16 @@ A small web page that creates project folders and keeps one
 `claude remote-control` server running per project, so each project shows up
 in claude.ai/code and the Claude app with its own memory.
 
-It runs as whoever starts it. Build and run:
+It runs as whoever starts it, and the folder it is started in holds the
+projects, one subfolder each. Build it, then run it there:
 
-    go build && ./claude-launcher
+    go build
+    cd ~/projects && /path/to/claude-launcher
 
 | Variable | Default | |
 |---|---|---|
 | `LAUNCHER_ADDR` | `127.0.0.1:8787` | where the page listens |
 | `LAUNCHER_PASSWORD` | none | required unless the address is loopback; any user name |
-| `LAUNCHER_PROJECTS` | `~/projects` | one subfolder per project |
 | `LAUNCHER_PERMISSION_MODE` | `default` | passed to `claude remote-control` |
 
 Everything else in its environment, such as `GH_TOKEN`, reaches Claude.
