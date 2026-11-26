@@ -70,10 +70,10 @@ func restartAll() {
 	}
 	servers.Unlock()
 	for _, name := range names {
-		if s := switchOff(name); s != nil {
+		if s := switchOff(name); s != nil { // nil: switched off by hand meanwhile
 			<-s.ended
+			switchOn(name)
 		}
-		switchOn(name)
 	}
 }
 
@@ -109,19 +109,26 @@ func (s *server) run() {
 			s.setProcess(cmd, started)
 			exited := make(chan struct{})
 			go func() { cmd.Wait(); close(exited) }()
-			select {
-			case <-exited:
-				syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) // whatever it left running
-			case <-s.stop:
-				syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+			stayedUp := time.After(20 * time.Second)
+			for running := true; running; {
 				select {
+				case <-stayedUp:
+					remoteControlWorks()
 				case <-exited:
-				case <-time.After(10 * time.Second):
-					syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-					<-exited
+					syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) // whatever it left running
+					running = false
+				case <-s.stop:
+					syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+					select {
+					case <-exited:
+					case <-time.After(10 * time.Second):
+						syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+						<-exited
+					}
+					return
 				}
-				return
 			}
+			s.flush()
 			s.setProcess(nil, time.Time{})
 		}
 		if time.Since(started) < 20*time.Second {
@@ -200,20 +207,28 @@ func (s *server) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// flush keeps the last thing the process printed when it had no line break.
+func (s *server) flush() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.addLine(s.partial)
+	s.partial = ""
+}
+
 func (s *server) addLine(raw string) {
 	line := strings.TrimSpace(plain([]byte(raw)))
 	if line == "" {
 		return
 	}
-	if len(line) > 300 {
-		line = line[:300]
+	if u := claudeURL.FindString(line); u != "" {
+		s.url = u
+	}
+	if r := []rune(line); len(r) > 300 {
+		line = string(r[:300])
 	}
 	s.lines = append(s.lines, line)
 	if len(s.lines) > 20 {
 		s.lines = s.lines[len(s.lines)-20:]
-	}
-	if u := claudeURL.FindString(line); u != "" {
-		s.url = u
 	}
 	if strings.Contains(line, "Enable Remote Control?") {
 		remoteControlNeeded(s.name)

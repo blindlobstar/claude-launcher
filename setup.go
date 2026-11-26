@@ -48,6 +48,7 @@ type system struct {
 	GitHubNote       string    // then, why
 	RemoteControlOff bool      // a server asked the one-time "Enable Remote Control?" question
 	Enabling         bool
+	EnableNote       string // why enabling it failed
 }
 
 // Blocked means no project can run.
@@ -97,6 +98,16 @@ func remoteControlNeeded(project string) {
 	setup.rcNeeded, setup.at = project, time.Time{}
 }
 
+// remoteControlWorks is called when a server has stayed up: the question
+// has been answered, here or some other way.
+func remoteControlWorks() {
+	setup.Lock()
+	defer setup.Unlock()
+	if setup.rcNeeded != "" {
+		setup.rcNeeded, setup.at = "", time.Time{}
+	}
+}
+
 func refreshSetup() {
 	setup.Lock()
 	defer setup.Unlock()
@@ -133,6 +144,7 @@ func currentSystem() system {
 	sys.Claude.Busy, sys.Claude.Note = setup.busy["claude"], setup.note["claude"]
 	sys.Gh.Busy, sys.Gh.Note = setup.busy["gh"], setup.note["gh"]
 	sys.RemoteControlOff, sys.Enabling = setup.rcNeeded != "", setup.busy["remote-control"] != ""
+	sys.EnableNote = setup.note["remote-control"]
 
 	remote.Lock()
 	sys.Claude.Latest, sys.Gh.Latest, sys.GitHub, sys.GitHubNote = remote.claude, remote.gh, remote.github, remote.githubNote

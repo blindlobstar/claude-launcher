@@ -52,6 +52,9 @@ func main() {
 	if projectsDir, err = os.Getwd(); err != nil {
 		log.Fatal(err)
 	}
+	if projectsDir == "/" {
+		log.Fatal("start claude-launcher in the folder that holds the projects, not in /")
+	}
 
 	mux := http.NewServeMux()
 	for _, part := range []string{"alert", "projects", "system"} {
@@ -130,7 +133,7 @@ func main() {
 
 	go func() {
 		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+		signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP) // SIGHUP: its terminal or SSH session closed
 		<-sig
 		stopAll()
 		os.Exit(0)

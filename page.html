@@ -136,8 +136,8 @@
     <label class="field"><span class="dim">&gt;</span><input name="code" placeholder="code" required autocapitalize="none" autocomplete="off" spellcheck="false"></label>
     <div class="actions">
       <button class="btn">Sign in</button>
-      <a href="#" class="dim" hx-post="/login/cancel" hx-target="#alert">cancel</a>
-      <span class="dim" hx-get="/login/status" hx-trigger="every 1s">{{template "login-status" .Login}}</span>
+      <a href="#" class="dim" hx-post="/login/cancel" hx-target="#alert" hx-swap="innerHTML">cancel</a>
+      <span class="dim" hx-get="/login/status" hx-trigger="every 1s" hx-swap="innerHTML">{{template "login-status" .Login}}</span>
     </div>
   </form>
 </fieldset>

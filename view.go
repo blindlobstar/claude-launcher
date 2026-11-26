@@ -48,12 +48,8 @@ func buildView() view {
 	sys.SigningIn = login.Active
 	host, _ := os.Hostname()
 	host, _, _ = strings.Cut(host, ".")
-	dir := projectsDir
-	if rest, ok := strings.CutPrefix(dir, home); ok {
-		dir = "~" + rest
-	}
 	v := view{
-		Host: host, Dir: dir, Notice: currentNotice(), Blocked: sys.Blocked(), Alert: alertFor(sys), Login: login,
+		Host: host, Dir: shortDir(projectsDir, home), Notice: currentNotice(), Blocked: sys.Blocked(), Alert: alertFor(sys), Login: login,
 		Programs: []line{programLine(sys.Claude, true), programLine(sys.Gh, true), programLine(sys.Git, false)},
 		Accounts: accountLines(sys),
 	}
@@ -65,6 +61,14 @@ func buildView() view {
 		v.Projects = append(v.Projects, row)
 	}
 	return v
+}
+
+// shortDir writes a folder inside the home folder with a ~.
+func shortDir(dir, home string) string {
+	if home != "" && home != "/" && (dir == home || strings.HasPrefix(dir, home+"/")) {
+		return "~" + dir[len(home):]
+	}
+	return dir
 }
 
 func alertFor(s system) *alert {
@@ -85,7 +89,11 @@ func alertFor(s system) *alert {
 	case s.RemoteControlOff && s.Enabling:
 		return &alert{Kind: "err", Title: "Enabling Remote Control…", Busy: true}
 	case s.RemoteControlOff:
-		return &alert{Kind: "err", Title: "Remote Control isn't enabled here", Detail: cant, Post: "/setup/remote-control", Label: "Enable"}
+		a := &alert{Kind: "err", Title: "Remote Control isn't enabled here", Detail: cant, Post: "/setup/remote-control", Label: "Enable"}
+		if s.EnableNote != "" {
+			a.Detail = "enabling failed: " + s.EnableNote
+		}
+		return a
 	}
 	if days := s.EndsSoon(); days >= 0 {
 		when := fmt.Sprintf("in %d days", days)
@@ -128,7 +136,7 @@ func programLine(p program, managed bool) line {
 	case p.Latest != "":
 		l.Right = "up to date"
 	}
-	if p.Note != "" && p.Busy == "" && p.Version != "" {
+	if p.Note != "" && p.Busy == "" && l.Class != "err" { // a missing claude reports it in the alert
 		l.Sub = "last try failed: " + p.Note
 	}
 	return l

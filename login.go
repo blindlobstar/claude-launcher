@@ -177,20 +177,26 @@ func enableRemoteControl() error {
 		return err
 	}
 	defer term.stop()
-	deadline := time.After(30 * time.Second)
-	for !strings.Contains(term.text(), "Enable Remote Control?") {
+	// If it runs for a while without asking, the question was answered some
+	// other way and there is nothing left to do.
+	asked, deadline := false, time.After(15*time.Second)
+	for waiting := true; waiting; {
 		select {
 		case <-term.exited:
 			return errors.New(lastLine(term.text()))
 		case <-deadline:
-			return errors.New("the question did not come up: " + lastLine(term.text()))
+			waiting = false
 		case <-time.After(300 * time.Millisecond):
+			asked = strings.Contains(term.text(), "Enable Remote Control?")
+			waiting = !asked
 		}
 	}
-	term.tty.WriteString("y\r")
-	select { // give it a moment to save the answer
-	case <-term.exited:
-	case <-time.After(5 * time.Second):
+	if asked {
+		term.tty.WriteString("y\r")
+		select { // give it a moment to save the answer
+		case <-term.exited:
+		case <-time.After(5 * time.Second):
+		}
 	}
 	setup.Lock()
 	setup.rcNeeded = ""

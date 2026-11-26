@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestTrustKeepsTheRestOfTheFile(t *testing.T) {
@@ -171,5 +172,33 @@ func TestAlertAndButtons(t *testing.T) {
 		if got := programLine(c.p, c.managed).Label; got != c.label {
 			t.Errorf("%+v: button %q, want %q", c.p, got, c.label)
 		}
+	}
+}
+
+func TestReviewFixes(t *testing.T) {
+	for _, c := range [][3]string{
+		{"/Users/boris/projects", "/Users/boris", "~/projects"},
+		{"/Users/boris", "/Users/boris", "~"},
+		{"/Users/boris-work/projects", "/Users/boris", "/Users/boris-work/projects"},
+		{"/srv/projects", "/", "/srv/projects"},
+		{"/srv/projects", "", "/srv/projects"},
+	} {
+		if got := shortDir(c[0], c[1]); got != c[2] {
+			t.Errorf("shortDir(%q, %q) = %q, want %q", c[0], c[1], got, c[2])
+		}
+	}
+	if l := programLine(program{Name: "gh", Note: "checksum does not match"}, true); l.Sub != "last try failed: checksum does not match" || l.Label != "Install" {
+		t.Errorf("a failed gh install should say why: %+v", l)
+	}
+	off := system{Claude: program{Name: "claude", Version: "2.1.332"}, SignedIn: true, RemoteControlOff: true, EnableNote: "boom"}
+	if a := alertFor(off); a == nil || a.Detail != "enabling failed: boom" || a.Label != "Enable" {
+		t.Errorf("a failed Enable should say why: %+v", a)
+	}
+
+	s := &server{name: "x"}
+	s.Write([]byte("first line\nContinue at https://claude.ai/code/" + strings.Repeat("é", 400)))
+	s.flush()
+	if len(s.lines) != 2 || !strings.HasSuffix(s.url, strings.Repeat("é", 400)) || !utf8.ValidString(s.lines[1]) || len([]rune(s.lines[1])) != 300 {
+		t.Errorf("last line without a line break: %d lines, url %d bytes, line %d runes", len(s.lines), len(s.url), len([]rune(s.lines[len(s.lines)-1])))
 	}
 }
