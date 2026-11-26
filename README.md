@@ -1,0 +1,29 @@
+# claude-launcher
+
+A small web page that creates project folders and keeps one
+`claude remote-control` server running per project, so each project shows up
+in claude.ai/code and the Claude app with its own memory.
+
+It runs as whoever starts it. Build and run:
+
+    go build && ./claude-launcher
+
+| Variable | Default | |
+|---|---|---|
+| `LAUNCHER_ADDR` | `127.0.0.1:8787` | where the page listens |
+| `LAUNCHER_PASSWORD` | none | required unless the address is loopback; any user name |
+| `LAUNCHER_PROJECTS` | `~/projects` | one subfolder per project |
+| `LAUNCHER_PERMISSION_MODE` | `default` | passed to `claude remote-control` |
+
+Everything else in its environment, such as `GH_TOKEN`, reaches Claude.
+
+The page lists the projects with a toggle each, the programs Claude needs and
+the Claude and GitHub accounts. It installs and updates Claude Code and `gh`
+for the current user; `git` has to be there already. When projects can't run,
+an alert at the top holds the fix: installing Claude Code, signing in (link
+out, code in) or the one-time "Enable Remote Control?" answer.
+
+Stopping the launcher stops its servers; after a restart, switch the projects
+on again from the page.
+
+Tests: `go test ./...`
