@@ -25,6 +25,13 @@ for the current user; `git` has to be there already. When projects can't run,
 an alert at the top holds the fix: installing Claude Code, signing in (link
 out, code in) or the one-time "Enable Remote Control?" answer.
 
+As a container, with the projects and Claude's home folder (sign-in,
+installed programs) kept in volumes:
+
+    docker build -t claude-launcher .
+    docker run -p 8787:8787 -e LAUNCHER_HOSTS=localhost \
+        -v projects:/projects -v claude-home:/home/claude claude-launcher
+
 Stopping the launcher stops its servers; after a restart, switch the projects
 on again from the page.
 
