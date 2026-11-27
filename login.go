@@ -164,7 +164,7 @@ func loginState() loginView {
 }
 
 // enableRemoteControl answers yes to the question `claude remote-control`
-// asks once per machine, in the project whose server ran into it.
+// asks once per machine, in the folder whose server ran into it.
 func enableRemoteControl() error {
 	setup.Lock()
 	project := setup.rcNeeded
@@ -172,7 +172,7 @@ func enableRemoteControl() error {
 	if project == "" {
 		return errors.New("no server has asked for it")
 	}
-	term, err := startTerminal(filepath.Join(projectsDir, project), "remote-control", "--name", project)
+	term, err := startTerminal(filepath.Join(projectsDir, project), serverArgs(project)...)
 	if err != nil {
 		return err
 	}

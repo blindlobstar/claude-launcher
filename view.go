@@ -10,7 +10,7 @@ import (
 type view struct {
 	Host, Dir          string
 	Notice             string // an action that just failed
-	Blocked            bool   // no project can run: the list is paused
+	Blocked            bool   // no folder can be switched on: the list is paused
 	Alert              *alert
 	Projects           []projectRow
 	On                 int
@@ -72,7 +72,7 @@ func shortDir(dir, home string) string {
 }
 
 func alertFor(s system) *alert {
-	const cant = "projects can't run"
+	const cant = "folders can't be switched on"
 	switch {
 	case s.Claude.Version == "" && s.Claude.Busy != "":
 		return &alert{Kind: "err", Title: "Installing Claude Code…", Busy: true}
@@ -103,7 +103,7 @@ func alertFor(s system) *alert {
 		case 1:
 			when = "tomorrow"
 		}
-		return &alert{Kind: "warn", Title: "Claude sign-in ends " + when, Detail: "then projects stop", Post: "/login", Label: "Log in again"}
+		return &alert{Kind: "warn", Title: "Claude sign-in ends " + when, Detail: "then the folders go offline", Post: "/login", Label: "Log in again"}
 	}
 	return nil
 }
@@ -131,7 +131,7 @@ func programLine(p program, managed bool) line {
 	case p.Outdated():
 		l.Dim, l.Post, l.Label = "→ "+p.Latest, "/setup/"+p.Name, "Update"
 		if p.Name == "claude" {
-			l.Sub = "updating restarts running projects"
+			l.Sub = "updating restarts the folders that are on"
 		}
 	case p.Latest != "":
 		l.Right = "up to date"

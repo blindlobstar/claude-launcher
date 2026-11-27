@@ -1,5 +1,5 @@
-// claude-launcher: a web page that creates project folders and keeps one
-// `claude remote-control` server running per project. It runs as whoever
+// claude-launcher: a web page that creates folders for Claude to work in and
+// keeps one `claude remote-control` server running per folder. It runs as whoever
 // starts it and is set up through the environment (see README).
 package main
 
@@ -31,7 +31,7 @@ var (
 	addr        = env("LAUNCHER_ADDR", "127.0.0.1:8787")
 	password    = os.Getenv("LAUNCHER_PASSWORD")
 	hosts       = strings.Fields(strings.ToLower(os.Getenv("LAUNCHER_HOSTS"))) // names the page is opened by
-	projectsDir = ""                                                           // the folder it is started in: one subfolder per project
+	projectsDir = ""                                                           // the folder it is started in: Claude's folders are its subfolders
 	permMode    = env("LAUNCHER_PERMISSION_MODE", "default")
 	page        = template.Must(template.ParseFS(assets, "page.html"))
 )
@@ -54,7 +54,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if projectsDir == "/" {
-		log.Fatal("start claude-launcher in the folder that holds the projects, not in /")
+		log.Fatal("start claude-launcher in the folder that holds Claude's folders, not in /")
 	}
 
 	mux := http.NewServeMux()
@@ -74,11 +74,20 @@ func main() {
 		}
 		done(w, true)
 	})
+	// asking to delete only brings up the question; answering it is the POST below
+	mux.HandleFunc("GET /projects/{name}/delete", func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		if loginState().Active || !slices.Contains(listProjects(), name) {
+			done(w, true)
+			return
+		}
+		render(w, "confirm-delete", rowFor(name))
+	})
 	mux.HandleFunc("POST /projects/{name}/{action}", func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
 		switch action := r.PathValue("action"); {
 		case !slices.Contains(listProjects(), name):
-			setNotice("no such project: " + name)
+			setNotice("no such folder: " + name)
 		case action == "on":
 			switchOn(name)
 		case action == "off":
@@ -89,6 +98,10 @@ func main() {
 			} else {
 				switchOff(name)
 				switchOn(name)
+			}
+		case action == "delete":
+			if err := deleteProject(name); err != nil {
+				setNotice("couldn't delete " + name + ": " + err.Error())
 			}
 		}
 		done(w, true)
@@ -139,7 +152,7 @@ func main() {
 		stopAll()
 		os.Exit(0)
 	}()
-	log.Printf("listening on %s, projects in %s", addr, projectsDir)
+	log.Printf("listening on %s, folders in %s", addr, projectsDir)
 	srv := &http.Server{Addr: addr, Handler: guard(mux), ReadHeaderTimeout: 10 * time.Second}
 	log.Fatal(srv.ListenAndServe())
 }

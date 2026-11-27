@@ -50,6 +50,12 @@
   .alert .dim { grid-column: 1; overflow-wrap: anywhere; }
   .alert .btn { grid-column: 2; color: var(--c); border-color: var(--c); }
   .alert .btn:hover { background: var(--c); color: var(--bg); }
+  /* a question: no mark, the answers on a line of their own */
+  .alert.ask b::before { content: none; }
+  .alert.ask .dim { grid-column: 1 / -1; }
+  .alert .actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 2ch; margin-top: .4rem; }
+  .alert .actions .btn:disabled { opacity: .55; cursor: progress; }
+  .alert .actions .btn:disabled:hover { background: none; color: var(--c); }
 
   h2 { font-size: 1em; font-weight: 600; margin: 1.7rem 0 .35rem; display: flex; justify-content: space-between; gap: 1ch; }
   h2 small { font-size: 1em; font-weight: normal; color: var(--dim); }
@@ -67,8 +73,8 @@
   .sub .btn { text-indent: 0; margin-left: 1ch; }
   .err .sub { color: var(--err); }
 
-  /* while nothing can run, the list and the new-project field are dimmed */
-  .paused, #projects:has(.paused) + form { opacity: .45; }
+  /* while nothing can run, the list and the new-folder field are dimmed */
+  .paused > :not(.del), #projects:has(.paused) + form { opacity: .45; }
   #projects:has(.paused) + form { pointer-events: none; }
 
   /* Claude Code's spinner glyphs */
@@ -95,6 +101,12 @@
   .btn:hover { background: var(--claude); color: var(--bg); }
   .btn.quiet { color: var(--dim); border-color: var(--line); }
   .btn.quiet:hover { color: var(--fg); border-color: var(--dim); background: none; }
+  .btn.del { color: var(--err); border-color: var(--err); height: 1.5em; padding-block: 0; line-height: 1; } /* no taller than the row's text, so rows don't move */
+  .btn.del:hover { background: var(--err); color: var(--bg); }
+
+  /* "edit" swaps every toggle for a delete button until "done"; the mark is a class
+     on #projects itself, so it survives the list's reloads */
+  #projects:not(.editing) :is(.del, .when-editing), #projects.editing :is(.toggle, .when-viewing) { display: none; }
 
   /* a text field: a rounded box with a prompt mark, like Claude Code's input */
   .field { display: flex; align-items: center; gap: 1ch; border: 1px solid var(--dim); border-radius: 6px; padding: .45rem 1.2ch; margin-top: .6rem; }
@@ -112,8 +124,8 @@
 </fieldset>
 <div id="alert">{{template "alert" .}}</div>
 <div id="projects" hx-get="/projects" hx-trigger="every 3s, refresh from:body">{{template "projects" .}}</div>
-<form hx-post="/projects" hx-target="#alert" hx-on::after-request="if (event.detail.successful) this.reset()">
-  <label class="field"><span class="dim">&gt;</span><input name="name" placeholder="new project name" pattern="[a-z0-9][a-z0-9\-]{0,39}" required autocapitalize="none" autocomplete="off" spellcheck="false"></label>
+<form hx-post="/projects" hx-target="#alert" hx-on::after-request="if (event.detail.successful) { this.reset(); this.previousElementSibling.classList.remove('editing') }">
+  <label class="field"><span class="dim">&gt;</span><input name="name" placeholder="new folder name" pattern="[a-z0-9][a-z0-9\-]{0,39}" required autocapitalize="none" autocomplete="off" spellcheck="false"></label>
   <div class="hint">enter to create · a-z, 0-9 and dashes</div>
 </form>
 <div id="system" hx-get="/system" hx-trigger="every 3s, refresh from:body">{{template "system" .}}</div>
@@ -155,17 +167,34 @@
 {{end}}
 {{end}}
 
+{{define "delete"}}<button class="btn del" hx-get="/projects/{{.Path}}/delete" hx-target="#alert">delete</button>{{end}}
+
+{{/* Shown in the alert area after "delete" on a folder; it isn't reloaded, so it stays until answered. */}}
+{{define "confirm-delete"}}
+<div class="alert err ask">
+  <b>Delete the folder {{.Name}}?</b>
+  <span class="dim">Everything in it goes, and so do Claude's memory and chats for it on this machine. This can't be undone.</span>
+  <div class="actions">
+    <button class="btn" hx-post="/projects/{{.Path}}/delete" hx-target="#alert" hx-disabled-elt="this">Delete</button>
+    <a href="#" class="dim" hx-get="/alert" hx-target="#alert">cancel</a>
+  </div>
+</div>
+{{end}}
+
 {{define "login-link"}}{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">Open the sign-in page ↗</a>{{else}}<span class="dim">getting the sign-in link…</span>{{end}}{{end}}
 
 {{define "login-status"}}{{if .Sent}}checking the code…{{end}}{{end}}
 
 {{define "projects"}}
-<h2>Projects <small>{{if .Blocked}}paused{{else}}{{.On}} of {{len .Projects}} on{{end}}</small></h2>
+<h2>Folders <small>
+  <span class="when-viewing">{{if .Projects}}<a href="#" onclick="this.closest('#projects').classList.add('editing'); return false">edit</a> · {{end}}{{if .Blocked}}paused{{else}}{{.On}} of {{len .Projects}} on{{end}}</span>
+  <a href="#" class="when-editing" onclick="this.closest('#projects').classList.remove('editing'); return false">done</a>
+</small></h2>
 <hr>
 {{range .Projects}}
 {{if $.Blocked}}
 <div class="row paused">
-  <span class="dot">○</span><div><b>{{.Name}}</b></div><input class="toggle" type="checkbox" disabled aria-label="{{.Name}}">
+  <span class="dot">○</span><div><b>{{.Name}}</b></div><input class="toggle" type="checkbox" disabled aria-label="{{.Name}}">{{template "delete" .}}
   <div class="sub">off</div>
 </div>
 {{else}}
@@ -177,8 +206,9 @@
   {{else}}
   <input class="toggle" type="checkbox" aria-label="{{.Name}}" hx-post="/projects/{{.Path}}/on" hx-trigger="change" hx-target="#alert">
   {{end}}
+  {{template "delete" .}}
   <div class="sub">
-    {{- if eq .State "on"}}since {{.Since}}{{if .URL}} · <a href="{{.URL}}" target="_blank" rel="noopener">open ↗</a>{{end}}
+    {{- if eq .State "on"}}since {{.Since}}{{if .URL}}<span class="when-viewing"> · <a href="{{.URL}}" target="_blank" rel="noopener">open ↗</a></span>{{end}}
     {{- else if eq .State "starting"}}starting…
     {{- else if eq .State "failed"}}can't start{{if .Reason}}: {{.Reason}}{{end}}{{if .Untrusted}}<button class="btn" hx-post="/projects/{{.Path}}/trust" hx-target="#alert">Trust</button>{{end}}
     {{- else}}off{{end -}}
@@ -186,7 +216,7 @@
 </div>
 {{end}}
 {{else}}
-<div class="row{{if .Blocked}} paused{{end}}"><span class="dot">○</span><div class="dim">no projects yet</div><span></span></div>
+<div class="row{{if .Blocked}} paused{{end}}"><span class="dot">○</span><div class="dim">no folders yet</div><span></span></div>
 {{end}}
 {{end}}
 

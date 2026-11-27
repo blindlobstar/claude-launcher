@@ -8,9 +8,11 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var nameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}$`)
@@ -45,13 +47,31 @@ func rowFor(name string) projectRow {
 
 func createProject(name string) error {
 	if !nameRE.MatchString(name) {
-		return errors.New("a project name is lowercase letters, digits and dashes, 40 at most")
+		return errors.New("a folder name is lowercase letters, digits and dashes, 40 at most")
 	}
 	dir := filepath.Join(projectsDir, name)
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		return err
 	}
 	return trust(dir)
+}
+
+// deleteProject removes a folder for good: its server, what Claude Code keeps
+// about it on this machine (chats, memory, trust) and then the folder itself.
+// The caller makes sure name is one of listProjects().
+func deleteProject(name string) error {
+	if s := switchOff(name); s != nil {
+		<-s.ended
+	}
+	dir := filepath.Join(projectsDir, name)
+	if _, err := exec.LookPath("claude"); err == nil {
+		// it also fails when it knows nothing about the folder, which is fine
+		out, err := run(time.Minute, "claude", "purge", dir, "--yes")
+		if err != nil && !bytes.Contains(out, []byte("No Claude Code project data found")) {
+			return errors.New("claude purge: " + lastLine(plain(out)))
+		}
+	}
+	return os.RemoveAll(dir)
 }
 
 // trust marks a folder as trusted the way the Claude Code docs describe doing

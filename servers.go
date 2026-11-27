@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// A server is one `claude remote-control` process for one project, restarted
+// A server is one `claude remote-control` process for one folder, restarted
 // when it exits. Three quick exits in a row mean it can't run; it then stays
 // "failed" with its last output until it is switched on again.
 type server struct {
@@ -93,11 +93,17 @@ func stopAll() {
 	}
 }
 
+// serverArgs starts a server that only offers its folder: it opens no chat of
+// its own, and a chat without a title gets a name that begins with the folder's.
+func serverArgs(name string) []string {
+	return []string{"remote-control", "--no-create-session-in-dir", "--remote-control-session-name-prefix", name, "--permission-mode", permMode}
+}
+
 func (s *server) run() {
 	defer close(s.ended)
 	quick := 0
 	for {
-		cmd := exec.Command("claude", "remote-control", "--name", s.name, "--permission-mode", permMode)
+		cmd := exec.Command("claude", serverArgs(s.name)...)
 		cmd.Dir = filepath.Join(projectsDir, s.name)
 		cmd.Stdout, cmd.Stderr = s, s
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // own group, so stopping it also stops what it started

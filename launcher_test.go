@@ -71,6 +71,43 @@ func TestProjectNames(t *testing.T) {
 	}
 }
 
+func TestDeleteProject(t *testing.T) {
+	home, projectsDir = t.TempDir(), t.TempDir()
+	bin, log := t.TempDir(), filepath.Join(t.TempDir(), "calls")
+	// a stand-in claude that notes how it was called and fails with the words it is given
+	os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\necho \"$@\" >> "+log+"\n[ -z \"$PURGE_FAILS\" ] || { echo \"$PURGE_FAILS\" >&2; exit 1; }\n"), 0o755)
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	dir := filepath.Join(projectsDir, "demo")
+	os.MkdirAll(filepath.Join(dir, "sub"), 0o755)
+	os.WriteFile(filepath.Join(dir, "sub", "file"), []byte("x"), 0o644)
+
+	t.Setenv("PURGE_FAILS", "no can do")
+	if err := deleteProject("demo"); err == nil || err.Error() != "claude purge: no can do" {
+		t.Errorf("a failed purge should stop the delete and say why, got %v", err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatal("the folder went although the purge failed")
+	}
+	// what the real one says about a folder Claude never worked in
+	t.Setenv("PURGE_FAILS", "No Claude Code project data found for "+dir+" under "+home+".")
+	if err := deleteProject("demo"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("the folder is still there: %v", err)
+	}
+	if calls, _ := os.ReadFile(log); string(calls) != strings.Repeat("purge "+dir+" --yes\n", 2) {
+		t.Errorf("claude was called as:\n%s", calls)
+	}
+}
+
+func TestServerArgs(t *testing.T) {
+	permMode = "auto"
+	if got := strings.Join(serverArgs("demo"), " "); got != "remote-control --no-create-session-in-dir --remote-control-session-name-prefix demo --permission-mode auto" {
+		t.Errorf("got %s", got)
+	}
+}
+
 func TestExtractGh(t *testing.T) {
 	var tgz bytes.Buffer
 	gz := gzip.NewWriter(&tgz)

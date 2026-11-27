@@ -51,7 +51,7 @@ type system struct {
 	EnableNote       string // why enabling it failed
 }
 
-// Blocked means no project can run.
+// Blocked means no folder can be switched on.
 func (s system) Blocked() bool { return s.Claude.Version == "" || !s.SignedIn || s.RemoteControlOff }
 
 // EndsSoon is the number of days until the sign-in ends when that is three or
@@ -73,7 +73,7 @@ var setup struct {
 	at       time.Time
 	busy     map[string]string // action -> what it is doing
 	note     map[string]string // action -> why its last run failed
-	rcNeeded string            // a project whose server asked the Remote Control question
+	rcNeeded string            // a folder whose server asked the Remote Control question
 }
 
 // Facts from the internet, fetched in the background about once an hour.
